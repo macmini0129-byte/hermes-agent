@@ -4168,11 +4168,22 @@ class DiscordAdapter(BasePlatformAdapter):
                     thread_id = str(thread.id)
                     auto_threaded_channel = thread
                     self._threads.mark(thread_id)
-                    # Register Daimon thread ownership
+                    # Register Daimon thread ownership + enforce session limits
                     if self._daimon and self._daimon.active:
-                        self._daimon.on_thread_created(
+                        _daimon_result = self._daimon.on_thread_created(
                             thread_id, str(message.author.id), {}
                         )
+                        if not _daimon_result.allowed:
+                            _deny_msg = _daimon_result.denial_reason or (
+                                f"⏳ You're #{_daimon_result.queue_position} in queue."
+                                if _daimon_result.queue_position > 0
+                                else "Session limit reached."
+                            )
+                            try:
+                                await thread.send(_deny_msg)
+                            except Exception:
+                                pass
+                            return  # Stop processing — session denied
 
         # Determine message type
         msg_type = MessageType.TEXT

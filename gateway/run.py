@@ -5646,6 +5646,9 @@ class GatewayRunner:
         if canonical == "kanban":
             return await self._handle_kanban_command(event)
 
+        if canonical == "daimon":
+            return await self._handle_daimon_command(event)
+
         if canonical == "retry":
             return await self._handle_retry_command(event)
         
@@ -8349,6 +8352,31 @@ class GatewayRunner:
 
         available = "`none`, " + ", ".join(f"`{n}`" for n in personalities)
         return f"Unknown personality: `{args}`\n\nAvailable: {available}"
+
+    async def _handle_daimon_command(self, event: MessageEvent) -> str:
+        """Handle /daimon — admin controls for the Daimon Discord bot."""
+        from gateway.config import Platform
+
+        text = (event.text or "").strip()
+        # Strip leading "/daimon"
+        for prefix in ("/daimon ", "/daimon"):
+            if text.lower().startswith(prefix):
+                text = text[len(prefix):].strip()
+                break
+
+        parts = text.split(None, 1)
+        subcommand = parts[0] if parts else "status"
+        args = parts[1] if len(parts) > 1 else ""
+
+        # Get the Discord adapter's Daimon hooks
+        adapter = self.adapters.get(Platform.DISCORD) if hasattr(self, "adapters") else None
+        daimon_hooks = getattr(adapter, "_daimon", None) if adapter else None
+
+        if not daimon_hooks or not daimon_hooks.active:
+            return "Daimon is not active (no admin_users configured)."
+
+        result = daimon_hooks.handle_admin_command(subcommand, args)
+        return result.message
 
     async def _handle_retry_command(self, event: MessageEvent) -> str:
         """Handle /retry command - re-send the last user message."""
