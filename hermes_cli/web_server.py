@@ -11,6 +11,7 @@ Usage:
 
 import asyncio
 import hmac
+import shutil
 import importlib.util
 import json
 import logging
@@ -3036,6 +3037,17 @@ def _resolve_chat_argv(
     """
     from hermes_cli.main import PROJECT_ROOT, _make_tui_argv
 
+    # Bypass the broken node-bootstrap logic that corrupts PATH (it injects
+    # literal "$HOME" / "$PATH" vars into PATH).  Setting HERMES_TUI_DIR skips
+    # both the bootstrap and the npm lookup in _make_tui_argv, using the
+    # pre-built TUI dist directly.
+    os.environ.setdefault("HERMES_SKIP_NODE_BOOTSTRAP", "1")
+    if not os.environ.get("HERMES_NODE"):
+        _node_path = shutil.which("node")
+        if _node_path:
+            os.environ["HERMES_NODE"] = _node_path
+    tui_dir = str(PROJECT_ROOT / "ui-tui")
+    os.environ.setdefault("HERMES_TUI_DIR", tui_dir)
     argv, cwd = _make_tui_argv(PROJECT_ROOT / "ui-tui", tui_dev=False)
     env = os.environ.copy()
     env.setdefault("NODE_ENV", "production")

@@ -1050,6 +1050,23 @@ def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
     """TUI: --dev → tsx src; else node dist (HERMES_TUI_DIR or ui-tui, build when stale)."""
     _ensure_tui_node()
 
+    # Fast path: use pre-built TUI dist directly, skip npm check entirely.
+    # The HERMES_TUI_DIR env is set by _resolve_chat_argv for the dashboard.
+    ext_dir = os.environ.get("HERMES_TUI_DIR")
+    if ext_dir and not tui_dev:
+        p = Path(ext_dir)
+        if (p / "dist" / "entry.js").exists():
+            # Use HERMES_NODE if set, otherwise find node on PATH
+            env_node = os.environ.get("HERMES_NODE")
+            if env_node and os.path.isfile(env_node) and os.access(env_node, os.X_OK):
+                node = env_node
+            else:
+                node_path = shutil.which("node")
+                if not node_path:
+                    node_path = "/usr/local/bin/node"
+                node = node_path
+            return [node, str(p / "dist" / "entry.js")], p
+
     def _node_bin(bin: str) -> str:
         if bin == "node":
             env_node = os.environ.get("HERMES_NODE")
